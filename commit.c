@@ -230,6 +230,10 @@ int commit_create(const char *message, ObjectID *commit_id_out) {
 
     free(serialized);
 
-    (void)message; (void)commit_id_out;
-    return -1;
+        if (head_update(&new_commit_id) != 0) {
+        return -1;
+    }
+
+    *commit_id_out = new_commit_id;
+    return 0;
 }
