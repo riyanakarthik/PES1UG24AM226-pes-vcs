@@ -246,5 +246,66 @@ int object_read(const ObjectID *id, ObjectType *type_out, void **data_out, size_
         free(buffer);
         return -1;
     }    
-  
+    const uint8_t *null_pos = memchr(buffer, '\0', file_size);
+    if (!null_pos) {
+        free(buffer);
+        return -1;
+    }
+
+    size_t header_len = (size_t)(null_pos - buffer);
+
+    char header[64];
+    if (header_len >= sizeof(header)) {
+        free(buffer);
+        return -1;
+    }
+
+    memcpy(header, buffer, header_len);
+    header[header_len] = '\0';
+
+    char type_str[16];
+    size_t parsed_len = 0;
+    if (sscanf(header, "%15s %zu", type_str, &parsed_len) != 2) {
+        free(buffer);
+        return -1;
+    }
+
+    ObjectType parsed_type;
+    if (strcmp(type_str, "blob") == 0) parsed_type = OBJ_BLOB;
+    else if (strcmp(type_str, "tree") == 0) parsed_type = OBJ_TREE;
+    else if (strcmp(type_str, "commit") == 0) parsed_type = OBJ_COMMIT;
+    else {
+        free(buffer);
+        return -1;
+    }
+
+    size_t actual_data_len = file_size - header_len - 1;
+    if (parsed_len != actual_data_len) {
+        free(buffer);
+        return -1;
+    }
+
+    ObjectID computed_id;
+    compute_hash(buffer, file_size, &computed_id);
+    if (memcmp(computed_id.hash, id->hash, HASH_SIZE) != 0) {
+        free(buffer);
+        return -1;
+    }
+
+    void *data_buf = malloc(parsed_len);
+    if (!data_buf && parsed_len > 0) {
+        free(buffer);
+        return -1;
+    }
+
+    if (parsed_len > 0) {
+        memcpy(data_buf, buffer + header_len + 1, parsed_len);
+    }
+
+    *type_out = parsed_type;
+    *data_out = data_buf;
+    *len_out = parsed_len;
+
+    free(buffer);
+    return 0;  
 }
