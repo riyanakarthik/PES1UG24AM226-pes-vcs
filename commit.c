@@ -196,6 +196,24 @@ int head_update(const ObjectID *new_commit) {
 int commit_create(const char *message, ObjectID *commit_id_out) {
     // TODO: Implement commit creation
     // (See Lab Appendix for logical steps)
+    if (!message || !commit_id_out) return -1;
+
+    Commit commit;
+    memset(&commit, 0, sizeof(Commit));
+
+    if (tree_from_index(&commit.tree) != 0) {
+        return -1;
+    }
+
+    ObjectID parent_id;
+    if (head_read(&parent_id) == 0) {
+        commit.parent = parent_id;
+        commit.has_parent = 1;
+    } else {
+        commit.has_parent = 0;
+    }
+
+
     (void)message; (void)commit_id_out;
     return -1;
 }
