@@ -212,7 +212,23 @@ int commit_create(const char *message, ObjectID *commit_id_out) {
     } else {
         commit.has_parent = 0;
     }
+        snprintf(commit.author, sizeof(commit.author), "%s", pes_author());
+    commit.timestamp = (uint64_t)time(NULL);
+    snprintf(commit.message, sizeof(commit.message), "%s", message);
 
+    void *serialized = NULL;
+    size_t serialized_len = 0;
+    if (commit_serialize(&commit, &serialized, &serialized_len) != 0) {
+        return -1;
+    }
+
+    ObjectID new_commit_id;
+    if (object_write(OBJ_COMMIT, serialized, serialized_len, &new_commit_id) != 0) {
+        free(serialized);
+        return -1;
+    }
+
+    free(serialized);
 
     (void)message; (void)commit_id_out;
     return -1;
