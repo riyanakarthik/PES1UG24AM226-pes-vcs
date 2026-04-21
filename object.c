@@ -171,8 +171,7 @@ int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out
 
     if (rename(temp_path, final_path) != 0) {
         unlink(temp_path);
-        free(full_object);
-        return -1;
+        free(full_object);        return -1;
     }
 
     int dir_fd = open(shard_dir, O_RDONLY);
