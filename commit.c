@@ -13,7 +13,6 @@
 //
 // PROVIDED functions: commit_parse, commit_serialize, commit_walk, head_read, head_update
 // TODO functions:     commit_create
-
 #include "commit.h"
 #include "index.h"
 #include "tree.h"
