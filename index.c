@@ -139,6 +139,7 @@ static int compare_index_entries(const void *a, const void *b) {
 //
 // Returns 0 on success, -1 on error.
 int index_load(Index *index) {
+    memset(index, 0, sizeof(Index));
     index->count = 0;
 
     FILE *f = fopen(INDEX_FILE, "r");
@@ -194,46 +195,59 @@ int index_load(Index *index) {
 //   - fflush, fileno, fsync, fclose    : flushing userspace buffers and syncing to disk
 //   - rename                           : atomically moving the temp file over the old index
 //
-// Returns 0 on success, -1 on error.
+
 int index_save(const Index *index) {
-    Index sorted = *index;
-    qsort(sorted.entries, sorted.count, sizeof(IndexEntry), compare_index_entries);
+    IndexEntry *sorted = malloc(index->count * sizeof(IndexEntry));
+    if (!sorted && index->count > 0) return -1;
+
+    for (int i = 0; i < index->count; i++) {
+        sorted[i] = index->entries[i];
+    }
+
+    qsort(sorted, index->count, sizeof(IndexEntry), compare_index_entries);
 
     char tmp_path[512];
     snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", INDEX_FILE);
 
     FILE *f = fopen(tmp_path, "w");
-    if (!f) return -1;
+    if (!f) {
+        free(sorted);
+        return -1;
+    }
 
-    for (int i = 0; i < sorted.count; i++) {
+    for (int i = 0; i < index->count; i++) {
         char hex[HASH_HEX_SIZE + 1];
-        hash_to_hex(&sorted.entries[i].hash, hex);
+        hash_to_hex(&sorted[i].hash, hex);
 
         fprintf(f, "%o %s %llu %u %s\n",
-                sorted.entries[i].mode,
+                sorted[i].mode,
                 hex,
-                (unsigned long long)sorted.entries[i].mtime_sec,
-                sorted.entries[i].size,
-                sorted.entries[i].path);
+                (unsigned long long)sorted[i].mtime_sec,
+                sorted[i].size,
+                sorted[i].path);
     }
 
     fflush(f);
     if (fsync(fileno(f)) != 0) {
         fclose(f);
         unlink(tmp_path);
+        free(sorted);
         return -1;
     }
 
     if (fclose(f) != 0) {
         unlink(tmp_path);
+        free(sorted);
         return -1;
     }
 
     if (rename(tmp_path, INDEX_FILE) != 0) {
         unlink(tmp_path);
+        free(sorted);
         return -1;
     }
 
+    free(sorted);
     return 0;
 }
 
