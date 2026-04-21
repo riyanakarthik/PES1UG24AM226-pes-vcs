@@ -139,6 +139,24 @@ static int subdir_seen(SubdirName *dirs, int count, const char *name) {
     }
     return 0;
 }
+static int build_tree_recursive(const Index *index, const char *prefix, ObjectID *id_out) {
+    Tree tree;
+    tree.count = 0;
+
+    size_t prefix_len = strlen(prefix);
+
+    SubdirName seen_dirs[MAX_TREE_ENTRIES];
+    int seen_dir_count = 0;
+
+    for (int i = 0; i < index->count; i++) {
+        const IndexEntry *entry = &index->entries[i];
+
+        if (prefix_len > 0) {
+            if (strncmp(entry->path, prefix, prefix_len) != 0) continue;
+            if (entry->path[prefix_len] != '/') continue;
+        }
+}
+
 int tree_from_index(ObjectID *id_out) {
     // TODO: Implement recursive tree building
     // (See Lab Appendix for logical steps)
