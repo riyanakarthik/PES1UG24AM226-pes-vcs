@@ -204,11 +204,8 @@ static int build_tree_recursive(const Index *index, const char *prefix, ObjectID
     return rc;
 }
 
-}
-
 int tree_from_index(ObjectID *id_out) {
-    // TODO: Implement recursive tree building
-    // (See Lab Appendix for logical steps)
-    (void)id_out;
-    return -1;
+    Index index;
+    if (index_load(&index) != 0) return -1;
+    return build_tree_recursive(&index, "", id_out);
 }
