@@ -10,12 +10,14 @@
 //   "100644 hello.txt\0" followed by 32 raw bytes of SHA-256
 
 #include "tree.h"
+#include "index.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <dirent.h>
 #include <sys/stat.h>
-
+int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out);
+extern int index_load(Index *index) __attribute__((weak));
 // ─── Mode Constants ─────────────────────────────────────────────────────────
 
 #define MODE_FILE      0100644
@@ -154,7 +156,8 @@ static int build_tree_recursive(const Index *index, const char *prefix, ObjectID
         if (prefix_len > 0) {
             if (strncmp(entry->path, prefix, prefix_len) != 0) continue;
             if (entry->path[prefix_len] != '/') continue;
-        }        const char *relative = (prefix_len == 0) ? entry->path : entry->path + prefix_len + 1;
+        }       
+        const char *relative = (prefix_len == 0) ? entry->path : entry->path + prefix_len + 1;
         const char *slash = strchr(relative, '/');
 
         if (slash == NULL) {
@@ -162,7 +165,7 @@ static int build_tree_recursive(const Index *index, const char *prefix, ObjectID
 
             TreeEntry *te = &tree.entries[tree.count++];
             te->mode = entry->mode;
-            te->hash = entry->id;
+            te->hash = entry->hash;
             snprintf(te->name, sizeof(te->name), "%s", relative);
         } else {
             size_t dir_len = (size_t)(slash - relative);
@@ -205,6 +208,7 @@ static int build_tree_recursive(const Index *index, const char *prefix, ObjectID
 }
 
 int tree_from_index(ObjectID *id_out) {
+    if (!index_load) return -1;
     Index index;
     if (index_load(&index) != 0) return -1;
     return build_tree_recursive(&index, "", id_out);
