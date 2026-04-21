@@ -143,7 +143,46 @@ int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out
     if (fd < 0) {
         free(full_object);
         return -1;
- }
+    }
+    size_t written_total = 0;
+    while (written_total < full_len) {
+        ssize_t written = write(fd, full_object + written_total, full_len - written_total);
+        if (written < 0) {
+            close(fd);
+            unlink(temp_path);
+            free(full_object);
+            return -1;
+        }
+        written_total += (size_t)written;
+    }
+
+    if (fsync(fd) != 0) {
+        close(fd);
+        unlink(temp_path);
+        free(full_object);
+        return -1;
+    }
+
+    if (close(fd) != 0) {
+        unlink(temp_path);
+        free(full_object);
+        return -1;
+    }
+
+    if (rename(temp_path, final_path) != 0) {
+        unlink(temp_path);
+        free(full_object);
+        return -1;
+    }
+
+    int dir_fd = open(shard_dir, O_RDONLY);
+    if (dir_fd >= 0) {
+        fsync(dir_fd);
+        close(dir_fd);
+    }
+
+    free(full_object);
+    return 0;
 
 }
 
