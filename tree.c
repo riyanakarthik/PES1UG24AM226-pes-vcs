@@ -154,7 +154,56 @@ static int build_tree_recursive(const Index *index, const char *prefix, ObjectID
         if (prefix_len > 0) {
             if (strncmp(entry->path, prefix, prefix_len) != 0) continue;
             if (entry->path[prefix_len] != '/') continue;
+        }        const char *relative = (prefix_len == 0) ? entry->path : entry->path + prefix_len + 1;
+        const char *slash = strchr(relative, '/');
+
+        if (slash == NULL) {
+            if (tree.count >= MAX_TREE_ENTRIES) return -1;
+
+            TreeEntry *te = &tree.entries[tree.count++];
+            te->mode = entry->mode;
+            te->hash = entry->id;
+            snprintf(te->name, sizeof(te->name), "%s", relative);
+        } else {
+            size_t dir_len = (size_t)(slash - relative);
+            if (dir_len == 0 || dir_len >= 256) return -1;
+
+            char dirname[256];
+            memcpy(dirname, relative, dir_len);
+            dirname[dir_len] = '\0';
+
+            if (!subdir_seen(seen_dirs, seen_dir_count, dirname)) {
+                if (seen_dir_count >= MAX_TREE_ENTRIES) return -1;
+                snprintf(seen_dirs[seen_dir_count++].name, sizeof(seen_dirs[0].name), "%s", dirname);
+
+                char child_prefix[512];
+                if (prefix_len == 0)
+                    snprintf(child_prefix, sizeof(child_prefix), "%s", dirname);
+                else
+                    snprintf(child_prefix, sizeof(child_prefix), "%s/%s", prefix, dirname);
+
+                ObjectID child_id;
+                if (build_tree_recursive(index, child_prefix, &child_id) != 0) return -1;
+
+                if (tree.count >= MAX_TREE_ENTRIES) return -1;
+
+                TreeEntry *te = &tree.entries[tree.count++];
+                te->mode = MODE_DIR;
+                te->hash = child_id;
+                snprintf(te->name, sizeof(te->name), "%s", dirname);
+            }
         }
+    }
+
+    void *serialized = NULL;
+    size_t serialized_len = 0;
+    if (tree_serialize(&tree, &serialized, &serialized_len) != 0) return -1;
+
+    int rc = object_write(OBJ_TREE, serialized, serialized_len, id_out);
+    free(serialized);
+    return rc;
+}
+
 }
 
 int tree_from_index(ObjectID *id_out) {
